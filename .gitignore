@@ -1,0 +1,10 @@
+# Rendered outputs and caches (rebuild with quarto render)
+economic-landscapes.html
+economic-landscapes.docx
+economic-landscapes.tex
+economic-landscapes_cache/
+economic-landscapes_files/
+.Rhistory
+.RData
+.Rproj.user/
+.DS_Store

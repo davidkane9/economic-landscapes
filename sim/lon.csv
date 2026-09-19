@@ -1,0 +1,12 @@
+regime,N,C,C_over_N,mean_distinct_optima
+uniform,20,1,0.0500,16.0000
+uniform,20,2,0.1000,16.0000
+uniform,20,3,0.1500,15.9675
+uniform,20,5,0.2500,15.3150
+uniform,20,7,0.3500,13.3425
+uniform,20,9,0.4500,11.4150
+uniform,20,11,0.5500,9.0550
+uniform,20,13,0.6500,7.3375
+uniform,20,15,0.7500,5.6525
+uniform,20,17,0.8500,4.5275
+uniform,20,19,0.9500,3.7550

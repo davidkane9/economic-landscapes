@@ -1,0 +1,7 @@
+regime,N,C,C_over_N,autocorr
+uniform,20,1,0.0500,0.9650
+uniform,20,3,0.1500,0.9668
+uniform,20,5,0.2500,0.9679
+uniform,20,9,0.4500,0.9651
+uniform,20,13,0.6500,0.9661
+uniform,20,19,0.9500,0.9646

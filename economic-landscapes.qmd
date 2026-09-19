@@ -1,0 +1,406 @@
+---
+title: "Economic Landscapes"
+subtitle: "Tunable Complexity and the Limits of Organizational Search"
+abstract: |
+  Standard theory assumes that a firm's objective is easy to maximize. This
+  paper studies the opposite case. A firm allocates a fixed integer budget among
+  $N$ inputs, and performance is the quadratic form $x^\top Q x$, a standard
+  quadratic program, computationally intractable in the worst case. Search is
+  therefore local: the firm hill-climbs among neighboring allocations defined
+  by a transfer operator. An agent-based simulation shows that the difficulty
+  of this landscape is tunable along two dials. The first is the curvature of
+  $Q$: concave performance is trivial to climb, while convexity makes the
+  landscape rugged. The second is the connection density $C/N$ of the search
+  neighborhood, which, holding the objective fixed, produces a crossover near
+  $C/N \approx 0.45$ from stranded search to search that glides to the top.
+  Patient climbing wins in the rugged regime, greedy climbing in the smooth
+  one: the best search rule depends on the environment.
+format:
+  pdf:
+    documentclass: article
+    papersize: letter
+    fontsize: 12pt
+    geometry: margin=1in
+    number-sections: true
+    toc: false
+    fig-pos: 'H'
+    fig-cap-location: bottom
+    fig-width: 6
+    fig-height: 3.6
+    keep-tex: true
+    include-in-header:
+      text: |
+        \usepackage[labelfont=bf]{caption}
+        \AtBeginDocument{\captionsetup{labelsep=space}}
+  html:
+    toc: true
+    number-sections: true
+    code-fold: true
+    code-tools: false
+    fig-width: 7
+    fig-height: 4.5
+    fig-align: center
+    theme: cosmo
+    embed-resources: true
+  docx:
+    number-sections: true
+    fig-dpi: 300
+    fig-width: 6
+    fig-height: 3.8
+    fig-cap-location: bottom
+crossref:
+  fig-title: "Fig."
+  fig-prefix: "Fig."
+  title-delim: " "
+bibliography: references.bib
+csl: springer-basic-author-date.csl
+execute:
+  echo: false
+  cache: true
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+source("R/simulations.R")
+suppressPackageStartupMessages({
+  library(ggplot2); library(dplyr); library(tidyr); library(knitr)
+})
+set.seed(1998)
+```
+
+**Keywords:** organizational search; NK fitness landscape; rugged landscapes; local search; quadratic programming; agent-based model
+
+> Now listen, you who say, "Today or tomorrow we will go to this or that city, spend a year there, carry on business and make money." Why, you do not even know what will happen tomorrow.
+>
+> --- James 4:13
+
+@zeckhauser1990 [p. 561] distinguish risk (known states, known probabilities) from uncertainty (known states, unknown probabilities) and from ignorance, in which one cannot even define what states are possible. Standard formal modeling lives in the first two cases; this paper is about the hazy middle ground, where the world is uncertain so deeply that it is hard to know what the "right" answer even is. The firm in the model that follows is not ignorant of its local situation: it sees the profit of every allocation in its immediate neighborhood exactly. Its ignorance is of the global structure: which peak is highest, and whether a better region lies beyond the next ridge. That is the ignorance a rugged landscape formalizes.
+
+## Introduction
+
+Since the formalization of the utility-function approach in @vonneumann1953, it has been standard to assume that the objective function is tractable: an agent's preferences may be represented by a function she is able to maximize subject to constraints, and she knows which inputs do so. For a large class of functions this is reasonable; for an equally large class it is not. Which class is more useful for modeling economic agents: those that are easy to maximize, or those that are difficult?
+
+We propose that functions which are difficult to maximize are better suited for modeling, because of the irreducible complexity confronting real economic agents. This is the flip side of Simon's [-@simon1976] bounded rationality. Failure to maximize can be explained two ways: either agents are not intelligent enough to find a findable maximum, or the maximum is difficult to find no matter how intelligent the agent. @sargent1993 surveys work on the first explanation. This paper models the second.
+
+The central message is that this second kind of difficulty is not a fixed quantity but a *tunable* one. It rises as the objective turns from concave to convex (as marginal returns to individual inputs turn from diminishing to increasing) and falls as a firm's budget lines become more freely exchangeable for one another, and where a firm sits along these two dimensions determines how hard its problem is and how it ought to search. Standard theory, by assuming a concave and easily climbed objective, quietly confines itself to the one corner of this space in which the problem is trivial.
+
+The agent here is a firm allocating a budget across competing uses, so the search is an organizational one, and the difficulty it faces is a feature of the firm's environment rather than of any single manager. That environmental difficulty is logically prior to whatever social dynamics are layered on top of it. Rival firms may imitate a leader, deform one another's landscapes, or converge on the same peak---but they do so on landscapes whose ruggedness, and hence whether the manner of search matters at all, is fixed by the economic and structural primitives mapped below. The single-firm regime map is in this sense the baseline a population-level model inherits: it marks off the terrain on which collective behavior can diverge from individual search from the terrain on which it cannot. This paper charts that baseline before populating it.
+
+Three questions organize the analysis. First, what makes a firm's allocation problem hard, which features of the profit function turn a tractable optimization into an intractable search? Second, when search must stay local, does the *way* a firm climbs matter, and if so, which rule fares best? Third, how does the difficulty of the landscape vary as the economic and structural ingredients are tuned: is there, as in the NK landscapes of evolutionary biology, a sharp transition between easy and hard regimes, or only a gentler crossover?
+
+The paper is organized as follows. The *Background* section sets out the profit-maximization problem and the rugged-landscape metaphor, whose roots lie in NK fitness models. *The Model* gives the formal specification: a quadratic profit function over a budget simplex, a transfer operator that makes search local, and the three rules a firm might climb by. *Results* reports the findings: first that a "patient" rule outperforms a "greedy" one on rugged landscapes, then that this advantage is a single slice of a two-dial map of complexity in which the difficulty of the landscape, the best way to search, and even the curvature of the underlying economics all move together. The *Discussion* interprets the findings and their limits, and the *Conclusion* concludes. A full model description following the ODD protocol [@grimm2020] is given in the appendix.
+
+## Background {#sec-background}
+
+Consider the example of a firm which seeks to maximize its profits by selecting the optimal allocation of input spending, subject to a budget constraint.
+
+**Definition:** The budget, $B \in \{0, 1, 2, \ldots\}$.
+
+The budget constraint and all input variables are restricted to the set of non-negative integers.
+
+**Definition:** The set of inputs, $X = \{x : x = x_1 x_2 \ldots x_N \text{ with } x_i \in \{0, 1, 2, \ldots, B\}\}$.
+
+The profit function, $\Pi(x)$, is drawn from the class of functions which map a vector of $N$ non-negative integers to $\mathbb{R}$.
+
+**Definition:** The budget constraint, $\displaystyle\sum_{i=1}^{N} x_i = B$.
+
+The fixed budget is a deliberate simplification. It sets aside the question of how much to spend in order to isolate the question of how to divide it, which is the problem a division head or budget committee faces once the total has been set. Nothing is lost by requiring the constraint to bind: an allocation that leaves part of the budget unspent is represented by adding an input, "unspent," whose coefficients in the profit function are zero.
+
+### Complexity
+
+For an arbitrary function $\Pi(x)$, the firm's profit maximization problem is well posed but difficult. The space of possible solutions is huge and, without global quasiconcavity, it is hard to know how neighboring points relate to one another: profit maximization becomes a problem of combinatorial optimization. As von Neumann and Morgenstern [-@vonneumann1953, p. 45] foresaw, the emphasis shifts toward "combinatorics and set theory" and away from the differential equations of mathematical physics. Consider:
+
+**Claim:** The number of different combinations of input allocations which satisfy the budget constraint is $\binom{N+B-1}{B}$. For a proof, see @cameron1994 [pp. 32--33].
+
+```{r}
+#| label: combinatorics
+#| include: false
+n_combos <- n_plans(20L, 50L)
+```
+
+Even for relatively modest values of $N$ and $B$, this is a very large number. For example, if $N = 20$ and $B = 50$ then there are `r format(n_combos, big.mark = ",", scientific = FALSE)` (about $`r sprintf("%.1f", n_combos / 10^floor(log10(n_combos)))` \times 10^{`r floor(log10(n_combos))`}$) possible combinations of integer budget allocations which exactly satisfy the budget constraint. This number grows extremely rapidly with $N$.
+
+Finding the optimal allocation is hard, moreover, when $\Pi(x)$ is non-trivial: the problem is NP-hard (established formally in *The Geometry of Complexity*, below). Global quasiconcavity, almost universally assumed, is what makes optimization easy: it guarantees that the sole local maximum is also the global one. Without it, a firm cannot know whether any local maximum it finds is the best available.
+
+The restriction to integer inputs is not the source of the difficulty: maximizing a non-concave quadratic is NP-hard even over the continuous simplex, so the hardness is intrinsic to the objective. The integers only compound it: the integer optimum need not lie near the continuous one.
+
+The point is to get away from models in which profit maximization is "easy." Simon [-@simon1976, p. 81] argues that rationality presupposes a complete and unattainable knowledge of the consequences of each choice, whereas real agents have only fragmentary knowledge of their situation. @alchian1950 [p. 211] adds that "[w]here foresight is uncertain, 'profit maximization' is meaningless as a guide to specifiable action."
+
+Economic theory since World War II can be read as two currents: the math-maximizing tradition of von Neumann and Morgenstern, favoring models solvable with pencil and paper, and the psych-satisficing tradition of Simon, describing what agents swamped by complexity actually do. Any picture of the attempt to deal with ignorance must specify the form of that ignorance precisely. One way is by analogy to rugged physical landscapes.
+
+### The Landscape Metaphor
+
+It is helpful to picture a profit function as a landscape. For $N=3$, the integer allocations satisfying the budget constraint form a triangular grid (a point fixed by its $\{X, Y\}$ coordinates, with $Z$ the residual budget), and the height above each point is its profit, with neighboring points connected when their allocations are one move apart. The landscape thus describes all attainable profits together with a way of moving among them by reallocating the budget.
+
+To fix ideas, suppose the budget is 50 over three spending items. Even this toy case admits 1,326 distinct integer allocations, and the profit function over them can take many shapes. @fig-landscapes shows three illustrative surfaces: a smoothly concave one with a single central peak a hill-climber reaches from anywhere; a bimodal one, two peaks split by a valley, where a firm on the wrong side climbs to the lower summit and stops; and a wildly rugged one, dense with local peaks, whose marked global maximum no uphill path reaches from most starts. The argument of this paper is that the landscapes firms actually face look far more like the third than the first.
+
+```{r}
+#| label: fig-landscapes
+#| fig-cap: "Three illustrative profit landscapes for a budget of 50 shared among three inputs, each rendered as a smooth surface on a fine $300 \\times 300$ grid over the triangle $x_1 + x_2 \\le 50$ (with $x_3$ the residual budget); height is profit. The actual integer problem has 1,326 allocations; these surfaces are illustrative height functions chosen to display three shapes (not realizations of the model's quadratic profit function), drawn on a finer mesh purely to make those shapes legible. (a) A smoothly concave landscape with a single peak that local search finds from anywhere. (b) A bimodal landscape: two peaks split by a valley, so a firm on the wrong side climbs only to the lower summit. (c) A rugged landscape with over 1,400 local peaks on the rendering grid; a global maximum exists (flagged) but no uphill path reaches it from most starting points"
+#| fig-width: 9
+#| fig-height: 4.5
+fig_stylized_landscapes()
+```
+
+The key point to notice about the standard approach is that the profit function is well-behaved. It is a quasiconcave function of the input amounts. In this case, fractional input amounts were allowed. There is only one local maximum for the function and that maximum is also the global one. Moreover, only local knowledge of the profit function is required to reach it. A firm need only "hill-climb" from one input combination to the next, each time moving in the direction of higher profits.^[Strictly speaking this holds only for continuous inputs: the integer optimum need not lie near the continuous one. The example merely highlights the conceptual difference from standard theory.]
+
+Global quasiconcavity makes hill-climbing possible: even managers ignorant of the function's details can reach the unique optimum by moving toward higher profit among neighboring allocations.
+
+But there is no reason to expect real profit functions to be so accommodating. If the landscape holds numerous peaks and valleys and a hidden global maximum, then from an arbitrary point no algorithm short of exhaustive search reaches the highest, and a firm relying on local search is easily stranded far below the best allocation, like a traveler in a foggy mountain range who, able to see only the immediate neighborhood, cannot tell which of a thousand peaks is tallest.
+
+The metaphor originates in population genetics. @wright1932 described a fitness landscape in which each genotype has an associated fitness, so that evolution becomes a search for higher points. @kauffman1987 gave the idea a formal footing with the study of adaptive walks on rugged landscapes. The explicit NK family, in which $N$ components each interact with $K$ others so that tuning $K$ continuously varies ruggedness from a single-peaked surface to a fully random one, was set out by @kauffman1989 and @kauffman1993. This tunability is precisely the property exploited below, and is what later made NK landscapes a workhorse for modeling search by organizations rather than genes [@kauffman1993]. The metaphor has been applied widely beyond biology, including to electoral competition in political science [@downs1957; @kollman1992; @jones1995].
+
+The migration of the metaphor from biology into the study of firms is now a substantial research program. @levinthal1997 recast organizational adaptation as an adaptive walk on a rugged NK landscape, showing how local search traps firms on local optima whose location depends on where they began. @rivkin2000 used the same machinery to explain why complex strategies resist imitation: when interactions among a firm's choices are dense, even a rival who copies most of a strategy lands far down the slope. Behind both lies March's [-@march1991] distinction between exploitation (refining what one already does) and exploration (searching for distant, possibly higher peaks). A hill-climber that only ever moves uphill is pure exploitation, forgoing the long jumps that might reach a better region. @baumann2019 review the two decades of work that followed. Much of it concerns organizational design: @rivkin2003 show that elements of organizational design, such as the allocation of decisions and the incentive system, interact with one another and with the pattern of interdependence among decisions, and @siggelkow2003 that a temporarily decentralized organization, later reintegrated, can outperform both the centralized and the permanently decentralized forms. A substantial agent-based literature uses closely related landscapes, from Vidgen and Padget's [-@vidgen2009] implementation of Kauffman's NKCS model to investigations of organizational search, task formation, and coordination by Wall [-@wall2018; -@wall2023] and of crowdsourcing under bounded rationality by @yan2018. Wall [-@wall2015] uses collaborative search on rugged performance landscapes to show that even randomized organizational change can improve performance. Two recent papers in this journal are closest to the question asked here, which is how the rule of search interacts with the difficulty of the problem. Wall [-@wall2023cmot] contrasts a satisficing algorithm with two variants of hill-climbing on NK landscapes and finds that the choice of algorithm changes the model's behavior, and @yayavaram2023 show that Lindblom's muddling through outperforms boundedly rational alternatives when complexity is high.
+
+The present model lives within this tradition and departs from it in three ways. First, the decision space is not a binary string but the set of integer allocations of a budget, so every move is a trade: funding one input means defunding another. Second, the objective is not a table of random contributions, whose workings @csaszar2018 sets out, but a quadratic form, whose difficulty can be stated as a theorem about a named optimization problem. Third, and most important, difficulty is tuned by two dials, not one. In a canonical NK model a single dial, $K$ (how many other components each interacts with), tunes the ruggedness of the *fitness function itself*. Only one of our dials is of that kind. The curvature and interaction structure of the profit matrix $Q$ play the role of $K$, tuning the ruggedness of the objective. Where a binary-string NK model sets that ruggedness by averaging random look-ups, here it carries economic meaning: diminishing or increasing marginal returns to each input, and interactions between inputs, over a budget. The *second* dial has no NK counterpart: the connection density $C$ of the transfer operator leaves the profit function untouched and tunes instead the *neighborhood graph*: which allocations count as adjacent, and so where a hill-climber may go. By the one-operator-one-landscape principle this changes the landscape but not the objective laid over it. That an NK-like band of maximal complexity emerges from varying *accessibility alone*, the profit function fixed, is the most distinctive finding below.
+
+## The Model {#sec-landscape}
+
+Whatever the merits of the landscape metaphor in biology and political science, the question remains whether it is useful in economics. The traditional profit function is already a surface over a grid of input combinations. What does calling it a "landscape" add?
+
+The answer is that the metaphor foregrounds the *neighborhood*: firms know more about input combinations near their current position than about distant ones, and, not knowing the global optimum, must search outward from the status quo. That search is a walk on a profit landscape.
+
+### The Profit Function
+
+Consider a firm faced with the single-period profit maximization problem introduced in the *Background* section. The key unspecified part of the model is the profit function, which we take to be a quadratic form,
+$$
+\Pi(x) = x^\top Q x = \sum_{i} Q_{ii}\, x_i^2 + \sum_{i \ne j} Q_{ij}\, x_i x_j,
+\qquad \sum_{i=1}^{N} x_i = B, \;\; x_i \in \{0, 1, 2, \ldots\},
+$$
+where $Q$ is a symmetric *profit matrix*: the diagonal entry $Q_{ii}$ is the curvature of profit in input $i$ alone (negative when marginal returns to that input diminish, positive when they increase), and the off-diagonal entry $Q_{ij}$ is the interaction between inputs $i$ and $j$ (a complementarity when positive, interference when negative).^[These are returns to an individual input at a fixed total budget. They are not returns to scale in the production-theoretic sense, which concern a proportional expansion of all inputs and are not defined when $B$ is fixed.] A single random draw of $Q$ is one landscape.
+
+We call the objective profit, but the label carries little weight. $\Pi$ is any scalar measure of performance that an organization tries to raise by reallocating a fixed budget: the "performance" or "fitness" of the organizational landscape literature [@levinthal1997; @baumann2019]. Costs, demand, and competition are not modeled separately. Whatever effect they have is folded into the coefficients of $Q$, and a reader who prefers the neutral term may read "performance" for "profit" throughout. We omit the first-order (linear) terms a fuller specification would carry: with a budget of $B$ the quadratic terms scale as $B^2$ and the linear terms only as $B$, so the quadratic part dominates by a factor of order $B$: even at the smallest budget studied, $B = 30$, by roughly thirty to one (the linear and quadratic coefficients are drawn from the same unit interval). Over the budgets considered here the linear part is thus a small correction that changes nothing of substance.
+
+Because the profit matrix is the heart of the model, it requires justification. Assume there is a "true" profit function. How does this proposal compare with it?
+
+- **Approximation:** Whatever its form, the true function can be approximated to second order by a quadratic, so take $\Pi$ to be such an approximation. Price effects are subsumed: since the price a firm pays for an input may vary with how much it buys, any gains or losses from budget-induced price movements fold into $Q$.
+- **Own-input returns and interactions:** The diagonal of $Q$ encodes whether marginal returns to each input diminish or increase (standard theory assumes they diminish, but an influential line of work stresses the positive feedbacks that make them increase [@arthur1994a; @krugman1991]), and the off-diagonal encodes whether inputs reinforce or interfere with one another. Allowing both signs lets one object span the range of economic possibilities.
+- **Non-monotonic interactions:** Ruggedness in an NK model comes from interactions under which the same change helps or hurts depending on the state of the other components. The quadratic form has this property. Moving one dollar from input $j$ to input $i$ changes profit by $2[(Qx)_i - (Qx)_j] + Q_{ii} + Q_{jj} - 2Q_{ij}$, whose sign depends on the entire allocation $x$. One might object that production technologies are marked by complementarities rather than by such sign changes [@milgrom1990], and that complementarities alone give a smooth landscape. The model agrees in part: complementarities combined with diminishing own-input returns (the diminishing-returns regime below) give a single peak. But under a binding budget every move funds one input by defunding another, so the gain from a transfer changes sign with the allocation even when every entry of $Q$ is positive, and once own-input returns increase the landscape is rugged although every interaction is a complementarity (the all-positive regime below).
+- **Multiple local optima:** A firm often judges its current allocation optimal because small departures lower profit, yet firms of the same size and industry allocate very differently. If all are optimizing, perhaps all sit at different local optima. For a generic $Q$ the landscape has many.
+- **Difficulty:** Most important, the problem is genuinely hard. Even a firm that knows $Q$ exactly will struggle to find the global optimum, or to know whether the local optimum it has found is global. As *The Geometry of Complexity* makes precise, maximizing $x^\top Q x$ over the budget simplex is a *standard quadratic program*, NP-hard in general.
+
+Crucially, this difficulty derives from the economics: the landscape is rugged because $Q$ allows increasing and diminishing marginal returns together with beneficial and harmful interactions, not because of some economically empty construction. It remains to formalize the neighborhood: the immediate vicinity a firm can see and step into from its current allocation.
+
+### Neighborhoods
+
+The metaphor is unintelligible without a notion of neighborhood: a point is a "peak" only if all *surrounding* points yield lower profits, so which points surround it must be specified. A straightforward definition is:
+
+**Definition:** The neighborhood of an allocation $x = (x_1, x_2, \ldots, x_N) \in X$ consists of all allocations $x' = (x_1', x_2', \ldots, x_N')$ for which, for some $i$ with $x_i \geq 1$, exactly two coordinates change: $x_i' = x_i - 1$ and $x_{i+1}' = x_{i+1} + 1$, with $x_j' = x_j$ for all $j \neq i, i+1$.
+
+In words, the neighborhood of a given allocation $x$ is the set of allocations that are identical except for two coordinates. For those two, one input receives one more unit (call them dollars) and the other receives one less unit. It is clear that if $x$ satisfies the budget constraint, then all allocations in the neighborhood of $x$ will also satisfy the constraint. Note that the redistribution of one dollar cannot go from a given input to any arbitrary input. Instead, each input is "partnered" with one other input to which it may transfer dollars. Each input may also, therefore, receive dollars from one other input. The subscripts denote this transfer scheme. Input $i$ may receive dollars from input $i-1$ and transfer dollars to input $i+1$. (Indices are read modulo $N$, with $0 \equiv N$, so input $N$ transfers to input $1$, completing the cycle.) Any circular transfer scheme may be modeled by renumbering the inputs.
+
+This definition formalizes Alchian's [-@alchian1950] concept of "conscious adaptive behavior." Alchian suggests two routes to success in an uncertain environment: imitating other successful agents, and trial and error among actions not too dissimilar from current practice. He doubts the latter converges, noting that a trial must be classifiable as success or failure and that ascent must be continual: a nearsighted grasshopper on a mound of rocks can crawl to the top of a particular rock but has no assurance of reaching the top of the mound, since it might first have to descend or hop to new rocks [@alchian1950, p. 219]. Because actual economic problems rarely allow such uninterrupted ascents, Alchian doubts trial and error reaches the global optimum, but his image of local rock-climbing matches the formal description used here.
+
+@cyert1992 describe firm search similarly. Firms must search for alternatives before choosing among them, and that search is "simple-minded" because it stays in the neighborhood of the problem symptom and the current alternative. As they put it, the neighborhood-of-existing-policy rule inhibits movement to radically new alternatives, whether because of assumed continuity in performance functions or the difficulty of conceiving the adjustments radical shifts require [@cyert1992, p. 170]. By restricting firms to the neighborhood specified above, we capture some of this insight within a more formal framework. Local, routine-bound search of this kind is also the engine of Nelson and Winter's [-@nelson1982] evolutionary theory of the firm, in which firms adapt by mutating and selecting among routines close to those they already run.
+
+Other definitions of neighborhood are possible and sometimes more appropriate. The transfer network could be denser, with each input transferring to and receiving from two others, roughly doubling the number of neighboring points. Alternatively, the allowed change could exceed a single dollar: a firm able to reallocate up to two dollars from one item would have a neighborhood comprising the earlier points plus larger redistributions.
+
+Changing the definition of a neighborhood does more than reframe a given landscape. It alters the landscape itself. A peak under one-dollar redistribution may not be a peak under two-dollar redistribution, and a point "near" the global optimum under one neighborhood may be "far" from it under another. The definition of a landscape must therefore include a definition of neighborhood. A landscape without neighborhoods has no structure. Neighborhoods are the device that transforms standard profit functions into profit landscapes.
+
+### Operators
+
+Consider the one-dollar redistribution neighborhood. In evolutionary computation such a rule is an "operator" (a function mapping a point to its set of neighbors), and a different operator (say, two-dollar redistribution) yields a different neighborhood and hence a different landscape: the "one operator, one landscape" principle [@jones1995].
+
+This matters because two landscapes can share a profit function (every allocation has the same height in each) yet differ entirely in which points are neighbors, and so in where a hill-climber can go. A profit landscape is defined by both a profit function and an operator. The operator matters as much as the economics.
+
+Two aspects of an operator matter: the number of connections between inputs and the number of dollars moved at a time. A one-connection, one-dollar operator and a two-connection, one-dollar operator both yield *walkable* landscapes (every allocation reachable from any start), the first's neighborhoods nested in the second's. A two-dollar operator instead can disconnect the space, leaving allocations that are one another's neighbors under one-dollar moves out of reach.
+
+The sweeps that follow use a one-parameter family: with $C$ connections per input, input $i$ may transfer a dollar to inputs $i+1, \ldots, i+C$ (modulo $N$), so $C$ runs from $1$ (sparsest ring) to $N-1$ (complete). Because the $i \to i+1$ links form a single directed cycle through all $N$ inputs, every allocation is reachable from every other under one-dollar transfers, for every $C \ge 1$.
+
+### Descriptive Statistics
+
+Consider a profit landscape with one-dollar redistribution and one connection per input. For each realization the entries of $Q$ are drawn uniformly from $[-1, 1]$, and the firm allocates a budget of 50 among 20 inputs. There is no uncertainty: for any allocation the firm knows the resulting profit.
+
+#### Local Optima
+
+The space of allocations is finite but immense: about $`r sprintf("%.1f", n_combos / 10^floor(log10(n_combos)))` \times 10^{`r floor(log10(n_combos))`}$ of them. How many are local optima? If few, a firm might safely hill-climb. If many, hill-climbing from an arbitrary start is likely to strand it below the global maximum.
+
+```{r}
+#| label: local-optima
+#| include: false
+lo <- count_local_optima(N = 20L, B = 50L, connections = 1L,
+                         n_land = 2000L, points_per = 1000L)
+# Exact ground truth on the fully enumerable instance N = 8, B = 20.
+en      <- read.csv("sim/enumerate.csv")
+en_u8_1 <- en[en$regime == "uniform"  & en$N == 8 & en$C == 1, ]
+nopt_u8 <- round(en_u8_1$mean_nopt)
+np_u8   <- en_u8_1$npoints
+nopt_s8 <- round(en[en$regime == "signed"   & en$N == 8 & en$C == 1, "mean_nopt"])
+nopt_l8 <- en[en$regime == "leontief" & en$N == 8 & en$C == 7, "mean_nopt"]
+```
+
+The space is far too large to enumerate at $N = 20$, but at smaller sizes it is not, and there local optima can be counted *exactly* rather than bounded. On the fully enumerable instance $N = 8$, $B = 20$ (each of its `r format(np_u8, big.mark = ",")` allocations tested against its neighbors directly), the one-connection operator leaves on average about `r format(nopt_u8, big.mark = ",")` local optima, roughly half a percent: rare per point, yet in the thousands absolutely (@tbl-enumerate). The count tracks the landscape, not the rule: it climbs to some `r format(nopt_s8, big.mark = ",")` under increasing returns (rugged) and collapses to essentially the single global optimum (`r sprintf("%.1f", nopt_l8)` on average) under diminishing returns (smooth), falling steeply as the neighborhood thickens. Beyond the reach of enumeration the $N = 20$ landscape behaves the same: a sample of `r format(lo$tested, big.mark = ",")` allocations turned up `r if (lo$local_maxima == 0) "no" else format(lo$local_maxima, big.mark = ",")` local maximum, consistent with local optima being rarer still at this size.^[A zero count does not mean local optima are absent: the global maximum is one, and the *Results* show there are many, since hill-climbers from different starts rest at different suboptimal peaks. It shows only that they are rare *per point*, as the enumeration confirms.] Either way, a firm hill-climbing from an arbitrary point reaches a local maximum below the global one and different from the one it would have reached starting elsewhere.
+
+```{r}
+#| label: tbl-enumerate
+#| tbl-cap: "Exact ground truth on the fully enumerable instance $N = 8$, $B = 20$ (888,030 allocations; uniform regime; 200 landscapes $\\times$ 8 starts). Local optima are counted exactly under the directed ring operator with $C$ connections per input. The Steepest and Least columns report the profit each rule attains as a percentage of the worst-to-best profit range, an absolute scale that the normalized profit ($\\times 100$) at $N = 20$ cannot offer. Local optima thin out and both rules approach the global optimum as $C/N$ rises; the patient rule's edge over the greedy one reverses near $C/N = 0.5$, the same crossover the larger sweeps show, here at a size where the global optimum is known exactly."
+source("R/complexity.R"); knitr::kable(tbl_enumerate(), align = "rrrr")
+```
+
+### Search Strategies
+
+A firm needs a rule for choosing among the improving moves in its neighborhood. We consider three, distinguished only by how large an uphill step each takes. Steepest Ascent means that a firm always moves to the highest point in its immediate neighborhood until it arrives at a local maximum. Under Median Ascent, a firm selects, from the subset of points higher than its current location, the median point and then moves. Least Ascent, as its name implies, causes the firm to take the smallest upward step at each iteration. The three thus span the range of greed in local search, from the most aggressive step to the most cautious. All three iterate until a local maximum is reached. We record the profit of that maximum, returning below to the number of steps each rule takes to get there.
+
+## Results {#sec-strategy}
+
+No actual firm is a mechanical hill-climber, but firms may behave "as if" [@friedman1953] they were, and it is worth asking which way of climbing fares best. The strategies considered are, in March's [-@march1991] terms, variants of *exploitation*: each moves uphill within the immediate neighborhood rather than jumping to a distant region of the landscape, the *exploration* end of the spectrum that other landscape work on firms emphasizes [@levinthal1997; @boroomand2021]. Holding the search radius fixed at the neighborhood isolates a subtler question: among purely local climbers, does the size of each uphill step matter?
+
+### Search-Rule Performance
+
+Take many random landscapes with twenty inputs and a budget of fifty, sparsely connected with one to five connections per input. The clear winner is Least Ascent: a firm does much better by climbing in the most gradual fashion available than by always taking the steepest step, because on such a landscape gradual slopes tend to lead to higher local maxima. Median Ascent, which takes the middle improving step, lands squarely between the two, so it is the *size* of the step, monotonically, that matters. The same ranking holds across several very different families of profit matrix, from a diminishing-returns penalty for imbalance through symmetric and all-positive coefficients to an increasing-returns specification, so it is no artifact of one construction. The full comparison appears in @fig-complexity-regime. As *The Geometry of Complexity* will show, however, this advantage belongs to the difficult, sparsely connected regime sampled here rather than being a universal law.
+
+Why should patience pay? The result echoes a robust pattern in the local-search literature: on rugged landscapes, *first-improvement* search (which accepts the first improving move) tends to reach higher local optima than *best-improvement* search, which always takes the steepest [@hansen2006; @ochoa2010]. Least Ascent is a stricter relative of first-improvement, taking the *smallest* improving step, so the intuition carries over (though the cited results concern first-versus-best improvement, not least-ascent specifically). Steepest Ascent settles quickly in the basin nearest its start. Least Ascent inches along a far longer walk, less pinned to the dominant gradient and so less likely to stay trapped [@ochoa2010], substituting, in March's [-@march1991] terms, for the long exploratory jumps the firm has forsworn. That patience is not free. In the sparse uniform regime Least Ascent reaches a higher optimum (about 30 normalized points against Steepest Ascent's 23 at $C/N = 0.10$) but only after roughly three times as many accepted moves (about 140 against 40, with Median Ascent between). Measured per unit of search effort the ranking inverts: Steepest Ascent earns about $0.55$ normalized points per accepted move to Least Ascent's $0.22$. Patience thus trades search effort for solution quality, and a firm facing real adjustment frictions, where each reallocation is itself costly, may rationally prefer the quicker, lower climb. The prescription to climb gradually holds when the rungs are cheap relative to the height gained and weakens as they grow expensive.
+
+As connections multiply, the three strategies converge: once the landscape is densely connected, every hill-climber reaches a relatively high point. This is the first hint of a deeper regularity: connection density is itself a dial on difficulty, which *The Geometry of Complexity* takes up directly, and there the ranking of the strategies reverses.
+
+### The Geometry of Complexity {#sec-complexity}
+
+The result of the previous section (that a patient firm outperforms a greedy one) is real but incomplete: it was measured at one corner of the parameter space, a single slice of a larger picture this section maps. An economic landscape has a *tunable complexity* governed by two distinct dials (the economics encoded in the profit function, and the structure of the search neighborhood), and where a firm sits between them sets how hard its problem is and how best to search.
+
+Two features, one of the profit matrix $Q$ of *The Model* (own-input curvature on its diagonal, interactions off it) and one of the search operator, serve as the dials, though, as shown below, their effects on the location of the complex regime are not fully separable.
+
+Maximizing a quadratic form over the budget simplex is what the optimization literature calls a *standard quadratic program*, and it is hard in a precise sense: the problem is NP-hard even when $Q$ has but a single positive eigenvalue [@pardalos1991] (their result is stated for one *negative* eigenvalue under minimization, the same statement here, since maximizing $x^\top Q x$ is minimizing $x^\top(-Q)x$). The number of distinct local solutions can grow exponentially with $N$ [@bomze1998], and in a limiting case it encodes the maximum-clique problem of a graph [@motzkin1965]. These are *worst-case* statements about the problem class. They do not by themselves imply that a particular random instance, say one with i.i.d. uniform coefficients, is hard, and indeed in the dense regime below every climber glides to the top. The simulations supply the missing typical-case evidence: in the *sparse* regime, random instances are empirically hard for local search, hill-climbers from different starts stranded on different, suboptimal peaks. Worst-case theory explains why no general algorithm can be relied on. The experiments show the difficulty bites on the instances a firm actually draws. Either way, search must stay local, and where a firm begins shapes where it ends.
+
+#### The economic dial: the curvature of profit
+
+The first dial is the curvature of $\Pi$, read off from the spectrum of $Q$. Because the firm is *maximizing*, curvature works in a way that is the reverse of first intuition. When $Q$ is close to negative definite (diminishing returns in every direction), profit is concave, there is a single optimum, and any hill-climber walks straight to it: the landscape is trivially smooth. When $Q$ is close to positive definite (*increasing returns*, as in the "signed" regime), profit is convex, the budget simplex is studded with corner optima, and the landscape is rugged.
+
+@fig-complexity-regime makes this precise by sweeping four coefficient regimes, ordered by curvature.^[The unit of analysis is the landscape: each contributes one value (the mean over its eight starts), and the $\pm 2$ standard-error bands are computed across landscapes, not across the $8 \times 1{,}000$ landscape--start cells, which would understate the error by treating correlated starts as independent. Starting position matters: the within- and between-landscape standard deviations are comparable (both about $5$ normalized points near $C/N = 0.10$, about $12$ near the complex band), so averaging over starts sharpens each estimate.] Because the firm moves within the budget constraint $\sum_i x_i = B$, the curvature that matters is not the raw spectrum of $Q$ but that of profit *restricted to the constraint's tangent space*: the reduced (projected) Hessian $Z^\top Q Z$, where the columns of $Z$ form an orthonormal basis of $\{v : \sum_i v_i = 0\}$.^[The constraint removes the all-ones direction, leaving $N-1$ curvature eigenvalues. Projecting in this way sharpens rather than overturns the unconstrained picture: the negative-eigenvalue fractions of the raw $Q$ are $0.97$, $0.50$, $0.37$, $0.21$, and projecting onto the simplex moves them to $1.00$, $0.50$, $0.39$, $0.17$, preserving the order. Both sets of fractions are averages over 8,000 random draws of $Q$ at $N = 20$, computed by the deposited script `eigen_fractions.R`.] As the fraction of negative eigenvalues of that reduced Hessian falls from $1.00$ (diminishing returns, concave on the simplex) through $0.50$ (uniform, indefinite) and $0.39$ (all-positive) to $0.17$ (increasing returns, convex), the landscape grows steadily more rugged: the advantage of patient over greedy search rises from essentially nothing to as much as thirty normalized profit points, and it persists to higher and higher connection densities.
+
+```{r}
+#| label: fig-complexity-regime
+#| fig-cap: "Least Ascent advantage (mean normalized profit of Least minus Steepest Ascent, $\\times 100$) against connection density C/N, for four coefficient regimes at N = 20, B = 50. Bands are plus or minus two standard errors over 1,000 landscapes. The regimes are ordered by the fraction of negative eigenvalues of the reduced Hessian of profit on the budget simplex (1.00, 0.50, 0.39, 0.17). The more convex Q (the stronger the increasing returns), the more rugged the landscape and the larger and more persistent the premium on patience. A concave (diminishing-returns) profit function is trivially smooth: every strategy ties"
+#| fig-width: 7.6
+#| fig-height: 4.1
+source("R/complexity.R"); fig_complexity_regime()
+```
+
+The economic reading is sharp. *Ruggedness is the signature of convexity*, of increasing marginal returns to individual inputs. Standard theory assumes concavity or quasiconcavity, and that assumption places it squarely on the flat diminishing-returns line of @fig-complexity-regime, the one regime in which the firm's problem is trivial and search is effortless. The interesting economics (the positive feedbacks that @arthur1994a and @krugman1991 insist matter) is exactly what makes the landscape hard.
+
+The regimes also differ in *where* their optima sit, and this sharpens the reading. Under diminishing returns a hill-climber funds all twenty inputs in near-equal measure: the balanced interior that concavity rewards, with no more than a few percent of the budget on any one input. Under indefinite or increasing returns it instead concentrates the budget on a minority, about seven of the twenty inputs with a quarter or more on the largest. The ruggedness of increasing returns is thus a ruggedness of *specialization*: the many optima are concentrated allocations that fund different subsets of inputs, so the hard economic question is not how to balance a portfolio but which few activities to bet on, an economically richer phenomenon than balanced interior peaks, and one with obvious path-dependence in which input happens to win.
+
+#### The structural dial: connection density
+
+The second dial holds the economics fixed (the uniform regime) and varies the density of the search neighborhood: the number of connections per input, $C$, relative to the number of inputs, $N$. At low $C/N$ the neighborhood is sparse, a firm is easily stranded on a mediocre allocation, and patient search pays handsomely. At high $C/N$ the neighborhood is so richly connected that search glides upward almost regardless of how it steps, and there greedy Steepest Ascent is the better rule. The two cross over near $C/N \approx 0.45$, and, for firms allocating among anywhere from four to forty inputs, the crossover sits at essentially the same $C/N$. It is $C/N$, not $C$ or $N$ alone, that governs the crossover. The resemblance to the ratio $K/N$ in Kauffman's NK landscapes is only formal: there the ratio tunes the ruggedness of the fitness function, whereas here it tunes the *accessibility* of a profit function that never changes. A bounded complex regime that arises from the search structure alone, with the objective held fixed, is the central finding of this section.
+
+What might $C/N$ mean for a firm? One reading is that the connection density measures the *fungibility* of the budget: how freely a dollar committed to one line can be moved to another. A sparse neighborhood (low $C/N$) is a firm whose budget lines are siloed, each dollar reallocatable to only a few neighboring uses, whether by accounting category, governance rule, or the specificity of committed capital. A dense one lets funds flow freely across uses. On this reading the structural dial is an organizational design variable of the kind @rivkin2003 study, and the central result a substantive claim: a firm's allocation problem is hardest (the manner of search matters most) at *intermediate* fungibility, where budgets are neither so rigid that no reallocation helps nor so fluid that any climber glides to the top. The rules governing how freely budget moves are a lever on the difficulty of the firm's own optimization, one it partly sets for itself.
+
+Why does the ranking *reverse* at high $C/N$ rather than the rules merely converging? The reversal is modest, but a plausible mechanism shows in the walks. Where the neighborhood is dense the landscape is effectively smooth (few, broad basins), so patience earns little. Yet Least Ascent still takes the smallest improving step, which in a large neighborhood means a very long walk (several times Steepest Ascent's, see *Results*, above) that creeps along shallow directions and can drift into a neighboring basin whose summit is marginally lower. Steepest Ascent, committing to the dominant gradient, drives straight to the top of the broad basin it starts in. The gradient-greed that strands a firm when peaks are many serves it when they are few. The crossover also appears on the exactly-enumerable instance of @tbl-enumerate, where the global optimum is known, so it tracks the landscape, not the unanchored profit scale at $N = 20$.
+
+#### The complexity plane
+
+The two dials combine into a single map. Holding the economics at the agnostic uniform regime, vary both the number of inputs $N$ and the connections per input $C$, and record for each cell two things: the average profit a hill-climber attains, and a measure of *complexity*. What should that measure be? One natural candidate is the variability of outcomes for a single strategy (how much the result depends on where the firm happens to start), but this merely rises with $C/N$ and so tracks the easy/hard gradient rather than isolating a complex regime. The measure that isolates it is the dispersion *across strategies*: at each point we take the standard deviation, across the three search rules, of the profit they reach, averaged over landscapes. Where this cross-strategy dispersion is large, how a firm searches matters a great deal. Where it is small, it scarcely matters, either because every rule succeeds or because none does. The measure does not equate complexity with randomness or with unpredictable outcomes. The dispersion is taken across *rules* on a given landscape, not across random draws, and it indexes one specific thing: whether the manner of search matters. "Complex regime" is used below in that sense only, and the ruggedness of the landscape itself is measured separately.
+
+That this dispersion tracks genuine ruggedness, and not merely a quirk of the three rules, can be checked against a standard measure. The number of *distinct* local optima reached by Steepest Ascent from sixteen random starts (a local-optima-network statistic [@ochoa2010]) falls monotonically with connectivity, from sixteen distinct peaks at $C/N \le 0.15$ (every start a different optimum) to fewer than four by $C/N = 0.95$. Connectivity tunes ruggedness, just as the cross-strategy measure presumes. The two are not the same curve, and that is the point: dispersion peaks not where ruggedness is greatest but at an intermediate value, where the landscape is rugged enough for the rules to diverge yet not so rugged that all of them fail.
+
+The choice of ruggedness metric matters here, and explains why a one-dollar operator yields a landscape that is at once highly "correlated" and genuinely hard. A more familiar metric, the lag-one autocorrelation of profit along a random walk, is uninformative in this model: because the operator moves a single dollar at a time, successive points barely differ and the autocorrelation sits near $0.97$ regardless of regime or connectivity. The model's difficulty lives in basin structure (long climbs and dependence on the starting point), not in high-frequency fitness fluctuation, which is why a basin-counting statistic discriminates where autocorrelation does not.
+
+```{r}
+#| label: fig-complexity-plane
+#| fig-cap: "Average profit attained by a hill-climber across the (N, C) plane (uniform regime, B = 50; shading is mean normalized profit, $\\times 100$). Profit rises smoothly with connection density: the sparsely connected region (below the dashed diagonal) is hard and the densely connected region (above it) is easy. The interesting crossover between them runs along the diagonal C = 0.45 N (dashed)"
+#| fig-width: 7.2
+#| fig-height: 4.4
+source("R/complexity.R"); fig_complexity_plane()
+```
+
+@fig-complexity-plane shows the result. Average profit (the shading) climbs smoothly with $C/N$: the region where connections are sparse relative to inputs is *hard*, search stranded low, while the densely connected region is *easy*, search gliding to the top. Neither extreme is interesting. What is interesting is the *crossover* between them---and it falls along a diagonal, the dashed line $C = 0.45\,N$.
+
+```{r}
+#| label: fig-complexity-band
+#| fig-cap: "Cross-strategy dispersion (the standard deviation, across the three search rules, of the profit reached, averaged over landscapes, $\\times 100$) against connection density C/N, for every N from 4 to 40 (uniform regime, B = 50). The curves collapse and peak together near C/N = 0.45 (dashed): complexity is greatest in the band between the too-hard and too-easy regimes, at a tunable value of the single ratio C/N"
+#| fig-width: 7.6
+#| fig-height: 4.1
+source("R/complexity.R"); fig_complexity_band()
+```
+
+That diagonal is exactly where complexity, in the cross-strategy sense, is greatest. @fig-complexity-band plots cross-strategy dispersion against $C/N$ for every $N$ from 4 to 40. The curves collapse onto one another and peak together near $C/N \approx 0.45$. Below the peak the landscape is too hard for any rule to accomplish much; above it, too easy for the rule to matter; only in the band between does the manner of searching make a real difference. This is the economic counterpart of a familiar lesson from Kauffman's NK landscapes (that complexity is greatest at neither extreme), but the mechanism is distinct: there an intermediate *interaction* density makes the fitness function maximally rugged, whereas here an intermediate *connection* density makes a fixed profit function maximally hard to search [@kauffman1993].
+
+The band's location is robust to the budget as well as to $N$. One might worry that, since the operator moves a single dollar, the threshold reflects step size relative to $B$. But repeating the sweep at $B = 30$, $50$, $80$, and $100$ leaves the dispersion peak in the same narrow band each time (@tbl-budget), even as the simplex grows finer. Neither $N$ nor the budget fixes the crossover. The connection density does.
+
+```{r}
+#| label: tbl-budget
+#| tbl-cap: "Budget-robustness: the connection density C/N at which cross-strategy dispersion peaks, for four budgets (N = 20, uniform regime, 800 landscapes each). The peak stays in the same narrow band as the budget more than triples."
+bud <- read.csv("sim/budget.csv")
+agg <- do.call(rbind, by(bud, bud$B, function(s) {
+  i <- which.max(s$cross_sd)
+  data.frame(`Budget B` = s$B[1], `Peak C/N` = sprintf("%.2f", s$C_over_N[i]),
+             `Peak dispersion` = sprintf("%.1f", s$cross_sd[i]), check.names = FALSE)
+}))
+knitr::kable(agg, row.names = FALSE, align = "ccc")
+```
+
+A sharper worry is that the crossover belongs not to the economics but to the *neighborhood graph*. The transfer operator is directed: input $i$ may send a dollar to $i+1, \ldots, i+C$ but cannot receive from those same inputs unless $C$ is large, so a given pair exchanges budget in *both* directions only once $C \ge N/2$---exactly where $C/N$ crosses $0.5$. The observed peak sits close to this reversibility threshold, which raises the possibility that the crossover merely marks the point at which walks stop being trapped behind one-way moves. (For the same reason, a "local maximum" here is local with respect to the directed neighborhood: for $C < N/2$ it need not be a maximum under the reverse moves.) To separate the two stories we re-run the dispersion sweep under two alternative operators: a *symmetric ring*, in which every connection allows transfers both ways (reversible at every $C$), and a *random-partner* operator, in which each input is wired to $C$ randomly chosen others rather than to a contiguous arc.
+
+```{r}
+#| label: fig-complexity-operator
+#| fig-cap: "Cross-strategy dispersion against out-degree per input divided by N (the natural common scale, since the symmetric ring has twice the out-degree of the others at a given C/N) for three neighborhood operators (N = 20, uniform regime, B = 50, 1,000 landscapes each): the directed ring of the main text, a symmetric (reversible) ring, and a random-partner graph. An interior dispersion peak survives under all three, but the peaks do not coincide: the two directed operators peak together near out-degree/N = 0.45--0.50, while the reversible ring peaks much later, near 0.70. Degree alone does not set the location (a reversible wiring needs more connections to reach maximal complexity), so wiring matters beyond raw degree"
+#| fig-width: 7.6
+#| fig-height: 4.1
+source("R/complexity.R"); fig_complexity_operator()
+```
+
+@fig-complexity-operator shows that the peak survives both. Were it merely the onset of reversibility, the symmetric operator (reversible at every $C$) would show no peak. Instead all three operators produce an interior maximum of cross-strategy dispersion. In connection-density terms the peaks sit near $C/N \approx 0.35$ (symmetric), $0.45$ (directed), and $0.50$ (random). One might hope these collapse once placed on the common scale of out-degree per input, since the symmetric ring has twice the out-degree of the others at a given $C/N$. They do not. Re-expressed against out-degree$/N$, the two directed operators still peak together near $0.45$--$0.50$, but the reversible ring peaks much later, near $0.70$: a reversible wiring needs *more* connections per input to reach maximal complexity, so wiring matters beyond raw degree. What is robust is the qualitative fact (an interior complexity peak at intermediate accessibility), not its precise location. Complexity is a property of the landscape, not of the ring lattice. That the pattern of connections matters over and above their number is a familiar lesson from the economic-networks literature [@schweitzer2009]; here it appears within the firm, in the wiring of its search neighborhood.
+
+The two dials are not, however, fully independent, and their interaction is informative. Sweeping *both*, the own-input curvature $r$ (the mean level of the diagonal of $Q$) against $C/N$, traces how the complex band moves through the plane (@fig-complexity-qplane). As own-input returns turn from strongly diminishing ($r<0$) to increasing ($r>0$), the ridge of maximum dispersion climbs from very sparse connectivity, near $C/N \approx 0.08$, up to $C/N \approx 0.5$---exactly as the mechanism predicts: more convex economics make more rugged landscapes, so search needs a denser neighborhood before it tips from stranded to effortless. Where maximal complexity sits is thus a joint property of the economics and the search structure. What is invariant is *that* it sits at an interior maximum at all, across regimes, operators, budgets, and $N$.
+
+```{r}
+#| label: fig-complexity-qplane
+#| fig-cap: "The two-dial map: cross-strategy dispersion (shading, $\\times 100$) over the plane of own-input curvature r (the mean level of the diagonal of Q; concave below 0, convex above) and connection density C/N, at N = 24, B = 50. Complexity grows sharply toward increasing returns. The line traces, for each r, the C/N at which dispersion peaks (the border between the too-hard and too-easy regimes), which climbs from very sparse connectivity under diminishing returns to about C/N = 0.5 under increasing returns: more convex economics require a denser search neighborhood to escape the hard regime"
+#| fig-width: 7.2
+#| fig-height: 4.4
+source("R/complexity.R"); fig_complexity_qplane()
+```
+
+## Discussion {#sec-discussion}
+
+The fundamental assumption of this paper is that firms face problems which are difficult rather than easy: they do not know which combination of inputs will maximize profits. We have modeled that search within the classic framework of a single-period budget allocation, but with a profit function far more complex than those traditionally employed---one that is analytically intractable, dense with local optima and a hidden global one.
+
+What the model says about search depends on where an organization sits. In the rugged regime, and only there, the manner of search matters, and gradual improvement tends to beat rapid improvement because the gradual move keeps further improvements open. The result is specific to rugged environments and reverses where the landscape is smooth. We do not offer it as managerial advice. The model has one decision maker, one period, and a stylized move set, and what it supports is a comparative statement about search rules on a class of landscapes, not a policy for governing an organization. One implication from the literature does carry over: the ruggedness that frustrates a firm's own search also protects the peak it reaches, since, as @rivkin2000 argues, a high-performing configuration on a complex landscape resists imitation, and copying most of a strategy still lands a rival far down the slope.
+
+That such conclusions can be drawn at all reflects a methodological wager. Analytical intractability is a virtue, not a vice: computational modeling derives conclusions from assumptions in exactly the manner that analytic results follow from simpler ones. Mailath [-@maliath1992, p. 265], discussing bounded rationality in evolutionary game theory, notes that modelers invoke bounded rationality not because players are unintelligent but because real strategic settings are more complex than fully rational models can capture: ideally we would study very complicated games, but because those resist analytic solution we retreat to simple models we can solve by hand. That retreat, this paper suggests, is not the only option---what is analytically intractable need not be computationally intractable.
+
+The model's limits should be kept in view. The transfer operator is a stylized device for making search local rather than a literal account of how budgets are reallocated; the coefficient distributions are convenient rather than estimated; the quadratic form assigns a payoff to every allocation, so that, like a standard production function, it treats every input mix as feasible, whereas technologies with tight complementarity constraints [@milgrom1990] may leave most mixes not viable at all, a restriction of the simplex we do not attempt; and the firm acts in a single period against a fixed landscape, without the dynamics, learning, or competitive feedback a fuller model would carry. Nothing here is calibrated to data, and the patience result in particular is a property of the rugged regime, not a universal law. What the model offers is tunability [@kauffman1993, p. 231]: landscape complexity and strategy sophistication can each be varied while the other is held fixed, and the model stays computationally, if not analytically, tractable. Mailath's "simple models" may be sufficient for economic analysis, but they are not necessary. Natural next steps are to let the landscape change over time, to give firms memory, and to calibrate the profit function to a concrete industry.
+
+The natural next step is to put many firms on the landscape at once. This is less a gap than the next layer up, and the regime map drawn here is what that layer inherits. Where the landscape is smooth the manner of search does not matter, and no amount of competition among firms can make it matter. Where the landscape is rugged the manner of search is decisive, and it is exactly there that imitation, rivalry, and feedback among firms have room to act. A single firm's search is in this sense logically prior to the social dynamics built on top of it: it fixes the terrain on which those dynamics play out. And the apparatus invites the company. Several firms could search a shared landscape competitively, with payoffs that depend on rivals' positions; high performers could be imitated in the manner @rivkin2000 studies, so that the very ruggedness that protects a leader's peak also shapes who converges on it; and a firm's moves could deform its rivals' landscapes, making the surface endogenous rather than fixed. Each turns the regime-dependent question studied here---when does the manner of search matter?---into a question about populations of firms, on terrain this paper has already mapped.
+
+## Conclusion {#sec-conclusion}
+
+The substantive payoff of that tunability is the map drawn in *The Geometry of Complexity*. Two dials set the difficulty of an economic landscape. The first is the curvature of the profit matrix $Q$: because the firm maximizes, diminishing returns make the problem trivial while increasing returns make it rugged, so that ruggedness is the signature of the convexity that concavity-based theory assumes away. The second is the connection density $C/N$ of the search neighborhood, which drives a crossover between a regime in which a firm is easily stranded and one in which it glides to the top---at an intermediate connection density (near $C/N \approx 0.45$ for our operator) whose location is robust to the number of inputs and the budget. An interior peak survives, though it shifts, under alternative wirings of the neighborhood. The much-discussed virtue of patient search lives only on the rugged side of this map. On the smooth side, greed is better.
+
+Interesting economic problems are difficult. Simple models (solvable with pencil and paper) have proved fruitful, but models that embrace the complexity of real economic scenarios have become practicable only recently, and may prove at least as fruitful as those that assume it away. If parsimony has its costs, perhaps complexity has its benefits.
+
+## Data and Code Availability {.unnumbered}
+
+::: {.content-visible when-meta="withauthor"}
+The study uses no external data. The simulation engine, the scripts that run every simulation and draw every figure and table, and the simulation results themselves are available at <https://github.com/davidkane9/economic-landscapes> and as Online Resource 1.
+:::
+
+::: {.content-visible unless-meta="withauthor"}
+The study uses no external data. The simulation engine, the scripts that run every simulation and draw every figure and table, and the simulation results themselves are provided, anonymized, as Online Resource 1.
+:::
+
+## Appendix: Model Description Following the ODD Protocol {.unnumbered}
+
+For completeness, this appendix restates the model using the ODD (Overview, Design concepts, Details) protocol [@grimm2020].
+
+**Purpose.** The model asks whether, on a rugged and analytically intractable profit landscape, the greediness of a purely local search strategy affects the quality of the optimum a firm reaches. It is built to compare hill-climbing strategies that differ only in the size of the uphill step they take.
+
+**Entities, state variables, and scales.** There is a single agent, a firm. Its state is a budget allocation $x = (x_1, \ldots, x_N)$, a vector of $N$ non-negative integers summing to the budget $B$. The environment is a profit landscape: a profit function $\Pi(\cdot)$ over the budget simplex together with a transfer operator that defines, for each allocation, its neighborhood. A landscape is characterized by the number of inputs $N$, the budget $B$, the number of connections per input, and the family from which the profit coefficients are drawn. A run is a single adaptive walk. The natural time scale is the number of steps to a local optimum, though only the optimum's height is recorded.
+
+**Process overview and scheduling.** At each step the firm evaluates the profit of every allocation in the neighborhood of its current allocation. If at least one neighbor is more profitable, the firm moves to an improving neighbor selected by its strategy: Steepest Ascent moves to the most profitable neighbor, Median Ascent to the median improving neighbor, and Least Ascent to the least profitable improving neighbor. The walk halts when no neighbor improves on the current allocation---a local optimum.
+
+**Design concepts.** *Basic principles:* NK-style tunably rugged landscapes and bounded-rational local search. *Emergence:* the height of the local optimum reached emerges from the interaction of strategy and landscape rather than being imposed. *Objectives:* the firm seeks higher profit. *Sensing:* the firm observes only the profits of allocations in its current neighborhood---purely local information. *Interaction:* there is no firm-to-firm interaction. Inputs interact through the cross-product terms of the profit function. *Stochasticity:* the profit coefficients and the firm's starting allocation are drawn at random. *Observation:* for each run the normalized profit at the local optimum is recorded (and, for the descriptive statistics, whether a sampled point is itself a local optimum).
+
+**Initialization.** For each run the entries of $Q$ are drawn from the specified family (uniform on $[-1, 1]$, the all-positive scheme, the signed scheme, or the diminishing-returns scheme), and the firm is placed at a random feasible allocation, drawn by assigning each of the $B$ dollars independently to an input chosen uniformly at random (a balls-into-boxes allocation). This rule is *not* uniform over the simplex of compositions. It concentrates starting points near the balanced center, each input receiving about $B/N$ dollars on average. Each reported quantity averages over many such landscapes (1,000 for the regime and operator comparisons, 800 for the $(N, C)$ and budget grids) and over eight random starting allocations per landscape. The random seeds are those set in `sim/run_sweeps.sh`, so every figure is exactly reproducible.
+
+**Input data.** The model uses no external data.
+
+**Submodels.** The profit function is the quadratic form $x^\top Q x$ given in *The Model*, built from squared (own-input curvature) and cross-product (interaction) terms, with no linear part. Equivalently, $Q = \mathrm{diag}(s) + \tfrac{1}{2}E$, where, for inputs $i$ and $j$, $s_i$ is the squared coefficient on input $i$ and $E_{ij}$ the cross coefficient between inputs $i$ and $j$ (the matrix $E$ being symmetric with zero diagonal). A *regime* is a recipe for drawing these coefficients independently for each landscape, and the four used here are: **uniform**, $s_i \sim U[-1,1]$ and $E_{ij} \sim U[-1,1]$; **all-positive**, $s_i \sim U[0,1]$ and $E_{ij} \sim U[0,1]$; **increasing-returns** ("signed"), $s_i \sim U[0,1]$ and $E_{ij} \sim U[-1,0]$; and **diminishing-returns**, $s_i = \sum_{t=1}^{N-1} U[-1,0]$ (a negative-definite diagonal) and $E_{ij} \sim U[0,1] + U[0,1]$ (positive complementarities). These distributions are chosen for convenience rather than estimated. What matters for the results is the sign pattern and rough magnitude of the coefficients---whether returns and complementarities are positive, negative, or mixed---not the precise shape of the draw. The diminishing-returns regime's cross term, for instance, is a sum of two uniforms and so has a triangular density on $[0,2]$. Replacing it with any comparable strictly positive distribution leaves the qualitative picture unchanged. The tunable-returns variant of *The Geometry of Complexity* instead centers the diagonal at a level $r$, $s_i \sim r + U[-1,1]$, with $E_{ij} \sim U[-1,1]$. The neighborhood is generated by the transfer operator, under which budget moves between paired inputs, and whose parameters set the transfer size and the number of connections per input. The three search strategies are as defined above. Profit is normalized by dividing by $B^2$ (the natural scale of a quadratic form in a budget of size $B$, since with order-one coefficients $x^\top Q x$ is of order $B^2$), and the reported figures multiply this normalized profit by 100.
+
+## References
+
+::: {#refs}
+:::
